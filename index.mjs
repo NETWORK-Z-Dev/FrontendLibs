@@ -23,10 +23,22 @@ export default class FrontendLibs {
                 : packageName;
 
             const targetPath = path.resolve(pathToSave, folderName);
+            const versionFile = path.join(targetPath, '.version');
 
-            if (fs.existsSync(targetPath)) {
-                console.log(`Removing old version of ${folderName}...`);
-                fs.rmSync(targetPath, { recursive: true, force: true });
+            // check if already installed with same version
+            if (fs.existsSync(targetPath) && fs.existsSync(versionFile)) {
+                const installedVersion = fs.readFileSync(versionFile, 'utf8').trim();
+                if (installedVersion === version) {
+                    return {
+                        success: true,
+                        message: `Package ${packageName}@${version} already installed. Skipped.`,
+                        path: targetPath,
+                        skipped: true
+                    };
+                } else {
+                    console.log(`Removing old version ${installedVersion} of ${folderName}...`);
+                    fs.rmSync(targetPath, { recursive: true, force: true });
+                }
             }
 
             const tempDir = path.join(process.cwd(), '.temp', `${Date.now()}`);
@@ -51,13 +63,17 @@ export default class FrontendLibs {
 
             this._copyRecursive(extractedPath, targetPath);
 
+            // write version file
+            fs.writeFileSync(versionFile, version, 'utf8');
+
             fs.rmSync(tempDir, { recursive: true, force: true });
 
             return {
                 success: true,
                 message: `Successfully installed ${packageName}@${version}`,
-                path: targetPath
-            }; 
+                path: targetPath,
+                skipped: false
+            };
 
         } catch (error) {
             return {
