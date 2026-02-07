@@ -5,25 +5,36 @@ import { execSync } from 'child_process';
 export default class FrontendLibs {
     static async install(packageSpec, pathToSave) {
         try {
-            const [packageName, version] = packageSpec.includes('@') && !packageSpec.startsWith('@')
-                ? packageSpec.split('@')
-                : [packageSpec, 'latest'];
+            let packageName, version;
 
-            const targetPath = path.resolve(pathToSave, packageName);
+            // parse package name and version from spec
+            const atIndex = packageSpec.lastIndexOf('@');
+            if (atIndex > 0) {
+                packageName = packageSpec.substring(0, atIndex);
+                version = packageSpec.substring(atIndex + 1);
+            } else {
+                packageName = packageSpec;
+                version = 'latest';
+            }
 
-            // delete if exists (replace with new version)
+            // extract clean folder name from scoped package
+            const folderName = packageName.includes('/')
+                ? packageName.split('/').pop()
+                : packageName;
+
+            const targetPath = path.resolve(pathToSave, folderName);
+
             if (fs.existsSync(targetPath)) {
-                console.log(`Removing old version of ${packageName}...`);
+                console.log(`Removing old version of ${folderName}...`);
                 fs.rmSync(targetPath, { recursive: true, force: true });
             }
 
             const tempDir = path.join(process.cwd(), '.temp', `${Date.now()}`);
             fs.mkdirSync(tempDir, { recursive: true });
 
-            const fullPackageName = `@hackthedev/${packageName}`;
             const installSpec = version === 'latest'
-                ? fullPackageName
-                : `${fullPackageName}@${version}`;
+                ? packageName
+                : `${packageName}@${version}`;
 
             console.log(`Fetching ${installSpec}...`);
 
