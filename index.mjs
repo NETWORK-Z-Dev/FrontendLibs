@@ -57,7 +57,7 @@ export default class FrontendLibs {
                 success: true,
                 message: `Successfully installed ${packageName}@${version}`,
                 path: targetPath
-            };
+            }; 
 
         } catch (error) {
             return {
