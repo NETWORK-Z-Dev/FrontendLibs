@@ -9,18 +9,12 @@ export default class FrontendLibs {
                 ? packageSpec.split('@')
                 : [packageSpec, 'latest'];
 
-            const targetDirName = version === 'latest'
-                ? packageName
-                : `${packageName}_${version}`;
+            const targetPath = path.resolve(pathToSave, packageName);
 
-            const targetPath = path.resolve(pathToSave, targetDirName);
-
+            // delete if exists (replace with new version)
             if (fs.existsSync(targetPath)) {
-                return {
-                    success: true,
-                    message: `Package ${packageName}@${version} already exists. Skipped.`,
-                    path: targetPath
-                };
+                console.log(`Removing old version of ${packageName}...`);
+                fs.rmSync(targetPath, { recursive: true, force: true });
             }
 
             const tempDir = path.join(process.cwd(), '.temp', `${Date.now()}`);
