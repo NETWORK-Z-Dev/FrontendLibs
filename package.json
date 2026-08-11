@@ -1,7 +1,7 @@
 {
     "name": "@hackthedev/frontend-libs",
-    "version": "1.0.8",
-    "description": "Simple Frontend Lib installer",
+    "version": "1.0.9",
+    "description": "Simple Library installer working for both backend and frontend with custom locations. Originally made for npm, now rider.",
     "license": "ISC",
     "author": "",
     "main": "index.mjs",
