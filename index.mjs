@@ -1,21 +1,24 @@
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
 
 export default class FrontendLibs {
+    static host = "https://dist.dcts.community";
+
     static async install(packageSpec, pathToSave) {
         try {
-            let packageName, version;
+            let packageName, version = null;
 
             // parse package name and version from spec
             const atIndex = packageSpec.lastIndexOf('@');
+
             if (atIndex > 0) {
                 packageName = packageSpec.substring(0, atIndex);
                 version = packageSpec.substring(atIndex + 1);
             } else {
                 packageName = packageSpec;
-                version = 'latest';
             }
+
+            if(!version) throw new Error("Package version is required!")
 
             // extract clean folder name from scoped package
             const folderName = packageName.includes('/')
@@ -25,52 +28,88 @@ export default class FrontendLibs {
             const targetPath = path.resolve(pathToSave, folderName);
             const versionFile = path.join(targetPath, '.version');
 
-            // check if already installed with same version
+            const packagePath = packageName
+                .split('/')
+                .map(part => encodeURIComponent(part))
+                .join('/');
+
+            const filesResponse = await fetch(
+                `${this.host}/api/package/${packagePath}/files/no-version`
+            );
+
+            // get response
+            const filesResult = await filesResponse.json();
+
+            if (filesResult.error) {
+                throw new Error(filesResult.error);
+            }
+
+            // api lists files n shit so we need that info lol
+            const files = filesResult.files;
+            const resolvedVersion = version ?? filesResult.version;
+
+            if (!files?.length) {
+                throw new Error("Package contains no files");
+            }
+
             if (fs.existsSync(targetPath) && fs.existsSync(versionFile)) {
                 const installedVersion = fs.readFileSync(versionFile, 'utf8').trim();
-                if (installedVersion === version) {
+
+                if (installedVersion === resolvedVersion) {
                     return {
                         success: true,
-                        message: `Package ${packageName}@${version} already installed. Skipped.`,
+                        message: `Package ${packageName}@${resolvedVersion} already installed. Skipped.`,
                         path: targetPath,
                         skipped: true
                     };
-                } else {
-                    console.log(`Removing old version ${installedVersion} of ${folderName}...`);
-                    fs.rmSync(targetPath, { recursive: true, force: true });
                 }
+
+                fs.rmSync(targetPath, {
+                    recursive: true,
+                    force: true
+                });
             }
 
-            const tempDir = path.join(process.cwd(), '.temp', `${Date.now()}`);
-            fs.mkdirSync(tempDir, { recursive: true });
+            fs.mkdirSync(targetPath, {
+                recursive: true
+            });
 
-            const installSpec = version === 'latest'
-                ? packageName
-                : `${packageName}@${version}`;
+            for (const file of files) {
+                const encodedFilePath = file
+                    .split('/')
+                    .map(part => encodeURIComponent(part))
+                    .join('/');
 
-            console.log(`Fetching ${installSpec}...`);
+                const fileUrl = version
+                    ? `${this.host}/api/package/${packagePath}/${version}/${encodedFilePath}`
+                    : `${this.host}/api/package/${packagePath}/${encodedFilePath}`;
 
-            const tarballName = execSync(
-                `npm pack ${installSpec}`,
-                { cwd: tempDir, encoding: 'utf8' }
-            ).trim();
+                const response = await fetch(fileUrl);
 
-            execSync(`tar -xzf ${tarballName}`, { cwd: tempDir });
+                if (!response.ok) {
+                    throw new Error(`Could not download ${file}`);
+                }
 
-            const extractedPath = path.join(tempDir, 'package');
+                const targetFilePath = path.join(targetPath, file);
 
-            fs.mkdirSync(pathToSave, { recursive: true });
+                fs.mkdirSync(path.dirname(targetFilePath), {
+                    recursive: true
+                });
 
-            this._copyRecursive(extractedPath, targetPath);
+                fs.writeFileSync(
+                    targetFilePath,
+                    Buffer.from(await response.arrayBuffer())
+                );
+            }
 
-            // write version file
-            fs.writeFileSync(versionFile, version, 'utf8');
-
-            fs.rmSync(tempDir, { recursive: true, force: true });
+            if (version) {
+                // write version file
+                fs.writeFileSync(versionFile, version, 'utf8');
+            }
 
             return {
                 success: true,
-                message: `Successfully installed ${packageName}@${version}`,
+                message: `Successfully installed ${packageSpec}`,
                 path: targetPath,
                 skipped: false
             };
@@ -85,32 +124,15 @@ export default class FrontendLibs {
 
     static async installMultiple(packages) {
         const results = [];
+
         for (const { package: pkg, path: pathToSave } of packages) {
             const result = await this.install(pkg, pathToSave);
-            results.push({ package: pkg, ...result });
+            results.push({
+                package: pkg,
+                ...result
+            });
         }
+
         return results;
-    }
-
-    static _copyRecursive(src, dest) {
-        if (!fs.existsSync(src)) return;
-
-        if (fs.statSync(src).isDirectory()) {
-            fs.mkdirSync(dest, { recursive: true });
-            const entries = fs.readdirSync(src, { withFileTypes: true });
-
-            for (const entry of entries) {
-                const srcPath = path.join(src, entry.name);
-                const destPath = path.join(dest, entry.name);
-
-                if (entry.isDirectory()) {
-                    this._copyRecursive(srcPath, destPath);
-                } else {
-                    fs.copyFileSync(srcPath, destPath);
-                }
-            }
-        } else {
-            fs.copyFileSync(src, dest);
-        }
     }
 }

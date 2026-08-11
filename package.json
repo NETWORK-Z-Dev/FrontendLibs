@@ -1,12 +1,12 @@
 {
-  "name": "@hackthedev/frontend-libs",
-  "version": "1.0.5",
-  "description": "Simple Frontend Lib installer",
-  "license": "ISC",
-  "author": "",
-  "main": "index.mjs",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "dependencies": {}
+    "name": "@hackthedev/frontend-libs",
+    "version": "1.0.8",
+    "description": "Simple Frontend Lib installer",
+    "license": "ISC",
+    "author": "",
+    "main": "index.mjs",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "dependencies": {}
 }
