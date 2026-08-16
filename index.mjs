@@ -1,8 +1,24 @@
 import fs from 'fs';
 import path from 'path';
+import {execSync} from "node:child_process";
 
 export default class FrontendLibs {
     static host = "https://dist.dcts.community";
+
+    static installFromBun(identifier, version = null){
+        let packageIdentifier = `${identifier}${version ? `@${version}` : ""}`;
+
+        try{
+            execSync(`bun install "${packageIdentifier}" --ignore-scripts`, {
+                stdio: "inherit"
+            });
+
+            return true;
+        }
+        catch{
+            return false;
+        }
+    }
 
     static async install(packageSpec, pathToSave) {
         try {
@@ -41,7 +57,31 @@ export default class FrontendLibs {
             const filesResult = await filesResponse.json();
 
             if (filesResult.error) {
-                throw new Error(filesResult.error);
+                if(filesResponse?.status === 404){
+                    // fallback to bun install and if successful return right away
+                    let bunRes = this.installFromBun(packageName, version)
+                    if(!bunRes) throw new Error(filesResult.error);
+
+                    if(bunRes === true) {
+                        return {
+                            success: true,
+                            message: `Successfully installed ${packageSpec}`,
+                            path: targetPath,
+                            skipped: false
+                        };
+                    }
+                    else{
+                        return {
+                            success: false,
+                            message: `Failed to install ${packageSpec}`,
+                            path: targetPath,
+                            skipped: false
+                        };
+                    }
+                }
+                else{
+                    throw new Error(filesResult.error);
+                }
             }
 
             // api lists files n shit so we need that info lol
